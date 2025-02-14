@@ -15,9 +15,18 @@ public class Endpoint {
 
 
 
-    public async Task<T> RunSync<T>(object requestInput, int updateDelay = 500, int timeout = 86400) {
+    public async Task<T> RunSync<T>(object requestInput, int updateDelay = 1000, int timeout = 86400) {
         var input = GetRequestObject(requestInput);
         var request = await client.PostAsync<JToken>($"v2/{endpointId}/runsync", input, timeout);
+
+        var status = request["status"]!.ToString();
+        if (Job.IsFinal(status)) {
+            if (Job.IsError(status)) {
+                throw new JobErrorException(status, request["error"]?.ToString()); 
+            }
+            return request.ToObject<T>()!;
+        }
+
         var job = new Job(client, endpointId, request["id"]!.ToString());
         return await job.Output<T>(updateDelay, timeout);
     }

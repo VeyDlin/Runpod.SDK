@@ -31,8 +31,11 @@ public class Job {
 
         if (IsFinal(status)) {
             lock (syncLock) {
-                jobOutput = response["output"]!;
                 jobStatus = response["status"]!.ToString();
+                if (IsError(jobStatus)) {
+                    throw new JobErrorException(jobStatus, response["error"]?.ToString());
+                }
+                jobOutput = response["output"]!;
             }
         }
 
@@ -41,7 +44,7 @@ public class Job {
 
 
 
-    public async Task<T> Output<T>(int updateDelay = 500, int timeout = 0) {
+    public async Task<T> Output<T>(int updateDelay = 1000, int timeout = 0) {
         if (jobOutput is not null) {
             return jobOutput!.ToObject<T>()!;
         }
@@ -54,8 +57,11 @@ public class Job {
                     continue;
                 }
                 lock (syncLock) {
-                    jobOutput = response["output"]!;
                     jobStatus = response["status"]!.ToString();
+                    if (IsError(jobStatus)) {
+                        throw new JobErrorException(jobStatus, response["error"]?.ToString());
+                    }
+                    jobOutput = response["output"]!;
                 }
                 break;
             }
@@ -77,7 +83,7 @@ public class Job {
 
 
 
-    public async IAsyncEnumerable<T> Stream<T>(int updateDelay = 500) {
+    public async IAsyncEnumerable<T> Stream<T>(int updateDelay = 1000) {
         while (true) {
             await Task.Delay(updateDelay);
 
@@ -101,7 +107,19 @@ public class Job {
 
 
 
-    private static bool IsFinal(string status) {
-        return new HashSet<string> { "COMPLETED", "FAILED", "TIMED_OUT", "CANCELLED" }.Contains(status);
+    public static bool IsFinal(string status) {
+        return IsCompleted(status) || IsError(status);
+    }
+
+
+
+    public static bool IsError(string status) {
+        return new HashSet<string> { "FAILED", "TIMED_OUT", "CANCELLED" }.Contains(status);
+    }
+
+
+
+    public static bool IsCompleted(string status) {
+        return status == "COMPLETED";
     }
 }
