@@ -1,8 +1,8 @@
-using Newtonsoft.Json.Linq;
-using Runpod;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Runpod.SDK;
 
@@ -35,7 +35,7 @@ internal class RunpodHttpClient {
 
 
 
-    public async Task<T> PostAsync<T>(string endpoint, JObject? data = null, int timeout = 10) {
+    public async Task<T> PostAsync<T>(string endpoint, JsonObject? data = null, int timeout = 10) {
         var cts = new CancellationTokenSource();
         cts.CancelAfter(TimeSpan.FromSeconds(timeout));
 
@@ -69,10 +69,10 @@ internal class RunpodHttpClient {
 
 
     public async Task<T> RunGraphQLAsync<T>(string query, int timeout = 100) {
-        var json = await PostAsync<JObject>(
+        var json = await PostAsync<JsonObject>(
             endpoint: $"{graphqlAddress}/graphql?api_key={apiKey}",
             data: new() { 
-                { "query", query } 
+                ["query"] = query 
             },
             timeout: timeout
         );
@@ -82,7 +82,7 @@ internal class RunpodHttpClient {
             throw new QueryException(errorMessage ?? "Unknown error occurred", query.ToString());
         }
 
-        return json.ToObject<T>()!;
+        return json.Deserialize<T>()!;
     }
 
 
@@ -93,6 +93,7 @@ internal class RunpodHttpClient {
         }
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
-        return JObject.Parse(content).ToObject<T>()!;
+        var jsonNode = JsonNode.Parse(content);
+        return jsonNode!.Deserialize<T>()!;
     }
 }

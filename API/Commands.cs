@@ -1,4 +1,4 @@
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 
 namespace Runpod.SDK.API;
 
@@ -14,35 +14,35 @@ public class Commands {
 
 
     // Fetch user information
-    public async Task<JToken> GetUser() {
-        var rawResponse = await client.RunGraphQLAsync<JToken>(Queries.User);
+    public async Task<JsonNode> GetUser() {
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.User);
         return rawResponse["data"]!["myself"]!;
     }
 
 
 
     // Update user settings
-    public async Task<JToken> UpdateUserSettings(string pubKey) {
-        var rawResponse = await client.RunGraphQLAsync<JToken>(Mutations.GenerateUserMutation(pubKey));
+    public async Task<JsonNode> UpdateUserSettings(string pubKey) {
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Mutations.GenerateUserMutation(pubKey));
         return rawResponse["data"]!["updateUserSettings"]!;
     }
 
 
 
     // Fetch all GPUs
-    public async Task<JToken> GetGpus() {
-        var rawResponse = await client.RunGraphQLAsync<JToken>(Queries.GpuTypes);
+    public async Task<JsonNode> GetGpus() {
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.GpuTypes);
         return rawResponse["data"]!["gpuTypes"]!;
     }
 
 
 
     // Fetch a specific GPU
-    public async Task<JToken> GetGpu(string gpuId, int gpuQuantity = 1) {
-        var rawResponse = await client.RunGraphQLAsync<JToken>(Queries.GenerateGpuQuery(gpuId, gpuQuantity));
+    public async Task<JsonNode> GetGpu(string gpuId, int gpuQuantity = 1) {
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.GenerateGpuQuery(gpuId, gpuQuantity));
         var gpus = rawResponse["data"]!["gpuTypes"]!;
 
-        if (gpus is null || gpus.Count() < 1) {
+        if (gpus is null || (gpus is JsonArray jsonArray && jsonArray.Count < 1)) {
             throw new ArgumentException("No GPU found with the specified ID. Use GetGpus() to see available GPUs.");
         }
 
@@ -52,23 +52,23 @@ public class Commands {
 
 
     // Fetch all pods
-    public async Task<JToken> GetPods() {
-        var rawResponse = await client.RunGraphQLAsync<JToken>(Queries.Pod);
+    public async Task<JsonNode> GetPods() {
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.Pod);
         return rawResponse["data"]!["myself"]!["pods"]!;
     }
 
 
 
     // Fetch a specific pod
-    public async Task<JToken> GetPod(string podId) {
-        var rawResponse = await client.RunGraphQLAsync<JToken>(Queries.GeneratePodQuery(podId));
+    public async Task<JsonNode> GetPod(string podId) {
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.GeneratePodQuery(podId));
         return rawResponse["data"]!["pod"]!;
     }
 
 
 
     // Create a pod
-    public async Task<JToken> CreatePod(
+    public async Task<JsonNode> CreatePod(
         string name,
         string imageName,
         string gpuTypeId,
@@ -107,25 +107,25 @@ public class Commands {
             env, templateId, networkVolumeId, allowedCudaVersions, minDownload, minUpload
         );
 
-        var rawResponse = await client.RunGraphQLAsync<JToken>(mutation);
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
         return rawResponse["data"]!["podFindAndDeployOnDemand"]!;
     }
 
 
 
     // Stop a pod
-    public async Task<JToken> StopPod(string podId) {
+    public async Task<JsonNode> StopPod(string podId) {
         var mutation = Mutations.GeneratePodStopMutation(podId);
-        var rawResponse = await client.RunGraphQLAsync<JToken>(mutation);
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
         return rawResponse["data"]!["podStop"]!;
     }
 
 
 
     // Resume a pod
-    public async Task<JToken> ResumePod(string podId, int gpuCount) {
+    public async Task<JsonNode> ResumePod(string podId, int gpuCount) {
         var mutation = Mutations.GeneratePodResumeMutation(podId, gpuCount);
-        var rawResponse = await client.RunGraphQLAsync<JToken>(mutation);
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
         return rawResponse["data"]!["podResume"]!;
     }
 
@@ -134,24 +134,24 @@ public class Commands {
     // Terminate a pod
     public async Task TerminatePod(string podId) {
         var mutation = Mutations.GeneratePodTerminateMutation(podId);
-        await client.RunGraphQLAsync<JToken>(mutation);
+        await client.RunGraphQLAsync<JsonNode>(mutation);
     }
 
 
 
     // Create a container registry authentication
-    public async Task<JToken> CreateContainerRegistryAuth(string name, string username, string password) {
+    public async Task<JsonNode> CreateContainerRegistryAuth(string name, string username, string password) {
         var mutation = Mutations.GenerateContainerRegistryAuth(name, username, password);
-        var rawResponse = await client.RunGraphQLAsync<JToken>(mutation);
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
         return rawResponse["data"]!["saveRegistryAuth"]!;
     }
 
 
 
     // Update a container registry authentication
-    public async Task<JToken> UpdateContainerRegistryAuth(string registryAuthId, string username, string password) {
+    public async Task<JsonNode> UpdateContainerRegistryAuth(string registryAuthId, string username, string password) {
         var mutation = Mutations.UpdateContainerRegistryAuth(registryAuthId, username, password);
-        var rawResponse = await client.RunGraphQLAsync<JToken>(mutation);
+        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
         return rawResponse["data"]!["updateRegistryAuth"]!;
     }
 
@@ -160,6 +160,6 @@ public class Commands {
     // Delete a container registry authentication
     public async Task DeleteContainerRegistryAuth(string registryAuthId) {
         var mutation = Mutations.DeleteContainerRegistryAuth(registryAuthId);
-        await client.RunGraphQLAsync<JToken>(mutation);
+        await client.RunGraphQLAsync<JsonNode>(mutation);
     }
 }

@@ -1,4 +1,5 @@
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Runpod.SDK.Endpoints;
 
@@ -9,7 +10,7 @@ public class Job {
     private RunpodHttpClient client;
 
     private string? jobStatus;
-    private JToken? jobOutput;
+    private JsonNode? jobOutput;
     private object syncLock = new();
 
 
@@ -26,7 +27,7 @@ public class Job {
             return jobStatus;
         }
 
-        var response = await client.GetAsync<JToken>($"v2/{endpointId}/status/{jobId}");
+        var response = await client.GetAsync<JsonNode>($"v2/{endpointId}/status/{jobId}");
         var status = response["status"]!.ToString();
 
         if (IsFinal(status)) {
@@ -46,12 +47,12 @@ public class Job {
 
     public async Task<T> Output<T>(int updateDelay = 1000, int timeout = 0) {
         if (jobOutput is not null) {
-            return jobOutput!.ToObject<T>()!;
+            return jobOutput!.Deserialize<T>()!;
         }
 
         var waitForCompletion = async () => {
             while (true) {
-                var response = await client.GetAsync<JToken>($"v2/{endpointId}/status/{jobId}");
+                var response = await client.GetAsync<JsonNode>($"v2/{endpointId}/status/{jobId}");
                 if (!IsFinal(response["status"]!.ToString())) {
                     await Task.Delay(updateDelay);
                     continue;
@@ -78,7 +79,7 @@ public class Job {
             await task;
         }
 
-        return jobOutput!.ToObject<T>()!;
+        return jobOutput!.Deserialize<T>()!;
     }
 
 
@@ -87,11 +88,14 @@ public class Job {
         while (true) {
             await Task.Delay(updateDelay);
 
-            var response = await client.GetAsync<JObject>($"v2/{endpointId}/stream/{jobId}");
+            var response = await client.GetAsync<JsonObject>($"v2/{endpointId}/stream/{jobId}");
 
             if (!IsFinal(response["status"]!.ToString()) || response.ContainsKey("stream")) {
-                foreach (var chunk in response["stream"]!) {
-                    yield return chunk["output"]!.ToObject<T>()!;
+                var streamArray = response["stream"]?.AsArray();
+                if (streamArray != null) {
+                    foreach (var chunk in streamArray) {
+                        yield return chunk!["output"]!.Deserialize<T>()!;
+                    }
                 }
             } else if (IsFinal(response["status"]!.ToString())) {
                 break;

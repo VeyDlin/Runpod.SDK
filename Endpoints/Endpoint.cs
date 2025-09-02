@@ -1,4 +1,5 @@
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Runpod.SDK.Endpoints;
 
@@ -17,14 +18,14 @@ public class Endpoint {
 
     public async Task<T> RunSync<T>(object requestInput, int updateDelay = 1000, int timeout = 86400) {
         var input = GetRequestObject(requestInput);
-        var request = await client.PostAsync<JToken>($"v2/{endpointId}/runsync", input, timeout);
+        var request = await client.PostAsync<JsonNode>($"v2/{endpointId}/runsync", input, timeout);
 
         var status = request["status"]!.ToString();
         if (Job.IsFinal(status)) {
             if (Job.IsError(status)) {
                 throw new JobErrorException(status, request["error"]?.ToString()); 
             }
-            return request.ToObject<T>()!;
+            return request.Deserialize<T>()!;
         }
 
         var job = new Job(client, endpointId, request["id"]!.ToString());
@@ -35,7 +36,7 @@ public class Endpoint {
 
     public async Task<Job> Run(object requestInput) {
         var input = GetRequestObject(requestInput);
-        var request = await client.PostAsync<JToken>($"v2/{endpointId}/run", input);
+        var request = await client.PostAsync<JsonNode>($"v2/{endpointId}/run", input);
         return new Job(client, endpointId, request["id"]!.ToString());
     }
 
@@ -59,11 +60,12 @@ public class Endpoint {
 
 
 
-    private JObject GetRequestObject(object requestInput) {
-        var input = JObject.FromObject(requestInput);
+    private JsonObject GetRequestObject(object requestInput) {
+        var jsonString = JsonSerializer.Serialize(requestInput);
+        var input = JsonNode.Parse(jsonString)!.AsObject();
         if (!input.ContainsKey("input")) {
-            input = new JObject {
-                ["input"] = JObject.FromObject(requestInput)
+            input = new JsonObject {
+                ["input"] = JsonSerializer.SerializeToNode(requestInput)
             };
         }
         return input;

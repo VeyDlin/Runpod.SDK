@@ -3,7 +3,7 @@
 ## Initializing the Client
 
 ```csharp
-var runpod = new RunpodClient("api key");
+var runpod = new RunpodClient("runpod__api_key");
 ```
 
 ## Working with Serverless Endpoints
@@ -11,13 +11,13 @@ var runpod = new RunpodClient("api key");
 ### Create an Endpoint
 
 ```csharp
-var endpoint = runpod.Endpoint("id");
+var endpoint = runpod.Endpoint("endpoint_id");
 ```
 
 ### Run a Synchronous Task
 
 ```csharp
-var runSyncResult = await RunSync<dynamic>(new {
+var runSyncResult = await endpoint.RunSync<JsonNode>(new {
     prompt = "Hello World"
 });
 ```
@@ -25,10 +25,10 @@ var runSyncResult = await RunSync<dynamic>(new {
 ### Run an Asynchronous Task and Wait for its Completion
 
 ```csharp
-var runJob = await Run(new {
+var runJob = await endpoint.Run(new {
     prompt = "Hello World"
 });
-var runResult = await runJob.Output<dynamic>();
+var runResult = await runJob.Output<JsonNode>();
 ```
 
 ### Stream Synchronous Task Output
