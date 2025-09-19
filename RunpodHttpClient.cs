@@ -12,6 +12,7 @@ internal class RunpodHttpClient {
     private string? apiKey { get; set; }
     private string graphqlAddress { get; set; }
     private string endpointAddress { get; set; }
+    private readonly RateLimiter rateLimiter = new();
 
 
     internal RunpodHttpClient(string endpointAddress, string graphqlAddress, string? apiKey = null) {
@@ -19,7 +20,13 @@ internal class RunpodHttpClient {
         this.graphqlAddress = graphqlAddress;
         this.apiKey = apiKey;
 
-        baseClient = new() {
+        var handler = new SocketsHttpHandler {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1),
+            EnableMultipleHttp2Connections = true
+        };
+
+        baseClient = new(handler) {
             Timeout = TimeSpan.FromMinutes(10),
             BaseAddress = new Uri(endpointAddress)
         };
@@ -36,34 +43,42 @@ internal class RunpodHttpClient {
 
 
     public async Task<T> PostAsync<T>(string endpoint, JsonObject? data = null, int timeout = 10) {
-        var cts = new CancellationTokenSource();
-        cts.CancelAfter(TimeSpan.FromSeconds(timeout));
+        return await rateLimiter.ExecuteAsync(endpoint, async () => {
+            return await ExecuteWithRetryAsync(async () => {
+                var cts = new CancellationTokenSource();
+                cts.CancelAfter(TimeSpan.FromSeconds(timeout));
 
-        var response = await baseClient.PostAsync(
-            cancellationToken: cts.Token,
-            requestUri: endpoint,
-            content: data is not null ? new StringContent(
-                data!.ToString(), 
-                Encoding.UTF8, 
-                "application/json"
-            ) : null
-        );
+                var response = await baseClient.PostAsync(
+                    cancellationToken: cts.Token,
+                    requestUri: endpoint,
+                    content: data is not null ? new StringContent(
+                        data!.ToString(), 
+                        Encoding.UTF8, 
+                        "application/json"
+                    ) : null
+                );
 
-        return await ParseResponseAsync<T>(response);
+                return await ParseResponseAsync<T>(response);
+            });
+        });
     }
 
 
 
     public async Task<T> GetAsync<T>(string endpoint, int timeout = 10) {
-        var cts = new CancellationTokenSource();
-        cts.CancelAfter(TimeSpan.FromSeconds(timeout));
+        return await rateLimiter.ExecuteAsync(endpoint, async () => {
+            return await ExecuteWithRetryAsync(async () => {
+                var cts = new CancellationTokenSource();
+                cts.CancelAfter(TimeSpan.FromSeconds(timeout));
 
-        var response = await baseClient.GetAsync(
-            cancellationToken: cts.Token,
-            requestUri: endpoint
-        );
+                var response = await baseClient.GetAsync(
+                    cancellationToken: cts.Token,
+                    requestUri: endpoint
+                );
 
-        return await ParseResponseAsync<T>(response);
+                return await ParseResponseAsync<T>(response);
+            });
+        });
     }
 
 
@@ -95,5 +110,29 @@ internal class RunpodHttpClient {
         var content = await response.Content.ReadAsStringAsync();
         var jsonNode = JsonNode.Parse(content);
         return jsonNode!.Deserialize<T>()!;
+    }
+
+
+
+    private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, int maxRetries = 4) {
+        var retryCount = 0;
+        while (true) {
+            try {
+                return await operation();
+            } catch (Exception ex) when (retryCount < maxRetries && ShouldRetry(ex)) {
+                retryCount++;
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, retryCount));
+                await Task.Delay(delay);
+            }
+        }
+    }
+
+
+
+    private bool ShouldRetry(Exception ex) {
+        return ex is HttpRequestException httpEx && 
+               (httpEx.InnerException is IOException || 
+                httpEx.Message.Contains("SSL connection could not be established") ||
+                httpEx.Message.Contains("The request was canceled"));
     }
 }

@@ -4,7 +4,7 @@ namespace Runpod.SDK;
 public class JobErrorException : Exception {
     public readonly string status;
 
-    public JobErrorException(string status, string ? message = null) : base(message) {
+    public JobErrorException(string status, string? message = null) : base(message) {
         this.status = status;
     }
 }
