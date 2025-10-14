@@ -130,9 +130,28 @@ internal class RunpodHttpClient {
 
 
     private bool ShouldRetry(Exception ex) {
-        return ex is HttpRequestException httpEx && 
-               (httpEx.InnerException is IOException || 
-                httpEx.Message.Contains("SSL connection could not be established") ||
-                httpEx.Message.Contains("The request was canceled"));
+        return ex is HttpRequestException httpEx &&
+            (
+                httpEx.InnerException is IOException ||
+                (
+                    httpEx.InnerException is System.Net.Sockets.SocketException sockEx && 
+                    IsTransientSocketError(sockEx)
+                ) ||
+                httpEx.Message.Contains("SSL connection could not be established")
+            );
+    }
+
+
+
+    private bool IsTransientSocketError(System.Net.Sockets.SocketException sockEx) {
+        return sockEx.SocketErrorCode switch {
+            System.Net.Sockets.SocketError.NetworkUnreachable => true,
+            System.Net.Sockets.SocketError.TimedOut => true,
+            System.Net.Sockets.SocketError.ConnectionRefused => true,
+            System.Net.Sockets.SocketError.ConnectionReset => true,
+            System.Net.Sockets.SocketError.ConnectionAborted => true,
+            System.Net.Sockets.SocketError.HostUnreachable => true,
+            _ => false
+        };
     }
 }
