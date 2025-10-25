@@ -1,7 +1,13 @@
 namespace Runpod.SDK.API;
 
 
+/// <summary>
+/// Contains GraphQL query templates for RunPod API operations.
+/// </summary>
 internal static class Queries {
+    /// <summary>
+    /// GraphQL query to fetch all pods owned by the current user.
+    /// </summary>
     public static readonly string Pod = @"
         query myPods {
             myself {
@@ -44,6 +50,9 @@ internal static class Queries {
     ";
 
 
+    /// <summary>
+    /// GraphQL query to fetch all available GPU types with basic information.
+    /// </summary>
     public static readonly string GpuTypes = @"
         query GpuTypes {
           gpuTypes {
@@ -55,6 +64,9 @@ internal static class Queries {
     ";
 
 
+    /// <summary>
+    /// GraphQL query to fetch all serverless endpoints owned by the current user.
+    /// </summary>
     public static readonly string Endpoint = @"
         query Query {
           myself {
@@ -91,6 +103,9 @@ internal static class Queries {
     ";
 
 
+    /// <summary>
+    /// GraphQL query to fetch current user information including network volumes and SSH keys.
+    /// </summary>
     public static readonly string User = @"
         query myself {
             myself {
@@ -108,6 +123,12 @@ internal static class Queries {
 
 
 
+    /// <summary>
+    /// Generates a GraphQL query to fetch detailed information about a specific GPU type.
+    /// </summary>
+    /// <param name="gpuId">GPU type identifier (e.g., "NVIDIA RTX A6000").</param>
+    /// <param name="gpuCount">Number of GPUs to query pricing for. Default: 1.</param>
+    /// <returns>GraphQL query string.</returns>
     public static string GenerateGpuQuery(string gpuId, int gpuCount = 1) {
         return $@"
             query GpuTypes {{
@@ -134,10 +155,15 @@ internal static class Queries {
               }}
             }}
         ";
-     }
+    }
 
 
 
+    /// <summary>
+    /// Generates a GraphQL query to fetch detailed information about a specific pod.
+    /// </summary>
+    /// <param name="podId">Pod identifier.</param>
+    /// <returns>GraphQL query string.</returns>
     public static string GeneratePodQuery(string podId) {
         return $@"
         query pod {{
@@ -178,4 +204,4 @@ internal static class Queries {
         }}
         ";
     }
- }
+}

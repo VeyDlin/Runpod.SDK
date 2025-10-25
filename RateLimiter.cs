@@ -35,8 +35,7 @@ internal class RateLimiter {
                 }
 
                 return await operation();
-            }
-            finally {
+            } finally {
                 concurrencyLimiter.Release();
             }
         }
@@ -44,10 +43,10 @@ internal class RateLimiter {
         private async Task WaitForRateLimitWindow() {
             while (true) {
                 TimeSpan? delayTime = null;
-                
+
                 lock (timestampLock) {
                     var windowStart = DateTime.UtcNow.AddSeconds(-config.windowSizeSeconds);
-                    
+
                     while (requestTimestamps.Count > 0 && requestTimestamps.Peek() < windowStart) {
                         requestTimestamps.Dequeue();
                     }
@@ -58,12 +57,12 @@ internal class RateLimiter {
 
                     var oldestRequest = requestTimestamps.Peek();
                     var waitTime = oldestRequest.AddSeconds(config.windowSizeSeconds) - DateTime.UtcNow;
-                    
+
                     if (waitTime > TimeSpan.Zero) {
                         delayTime = waitTime;
                     }
                 }
-                
+
                 if (delayTime.HasValue) {
                     Console.WriteLine($"Rate limit approaching, waiting {delayTime.Value.TotalMilliseconds}ms");
                     await Task.Delay(delayTime.Value);

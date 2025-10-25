@@ -3,44 +3,66 @@ using System.Text.Json.Nodes;
 namespace Runpod.SDK.API;
 
 
+/// <summary>
+/// Provides methods for managing RunPod resources via GraphQL API.
+/// Includes pod management, GPU queries, and user settings.
+/// </summary>
 public class Commands {
-    private RunpodHttpClient client;
+    private GraphQLClient graphql;
 
 
-    internal Commands(RunpodHttpClient client) {
-        this.client = client;
+    internal Commands(RunpodHttpClient client, string apiKey) {
+        graphql = client.CreateGraphQLClient(apiKey);
     }
 
 
 
-    // Fetch user information
+    /// <summary>
+    /// Fetches current user information including network volumes and SSH keys.
+    /// </summary>
+    /// <returns>User information as JSON node.</returns>
     public async Task<JsonNode> GetUser() {
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.User);
-        return rawResponse["data"]!["myself"]!;
+        return await graphql.ExecuteAndExtractAsync(Queries.User, "data.myself");
     }
 
 
 
-    // Update user settings
+    /// <summary>
+    /// Updates user settings, such as SSH public key.
+    /// </summary>
+    /// <param name="pubKey">SSH public key to set for the user.</param>
+    /// <returns>Updated user settings as JSON node.</returns>
     public async Task<JsonNode> UpdateUserSettings(string pubKey) {
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Mutations.GenerateUserMutation(pubKey));
-        return rawResponse["data"]!["updateUserSettings"]!;
+        return await graphql.ExecuteAndExtractAsync(
+            Mutations.GenerateUserMutation(pubKey),
+            "data.updateUserSettings"
+        );
     }
 
 
 
-    // Fetch all GPUs
+    /// <summary>
+    /// Fetches all available GPU types with their specifications.
+    /// </summary>
+    /// <returns>Array of GPU types as JSON node.</returns>
     public async Task<JsonNode> GetGpus() {
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.GpuTypes);
-        return rawResponse["data"]!["gpuTypes"]!;
+        return await graphql.ExecuteAndExtractAsync(Queries.GpuTypes, "data.gpuTypes");
     }
 
 
 
-    // Fetch a specific GPU
+    /// <summary>
+    /// Fetches detailed information about a specific GPU type.
+    /// </summary>
+    /// <param name="gpuId">GPU type identifier (e.g., "NVIDIA RTX A6000").</param>
+    /// <param name="gpuQuantity">Number of GPUs to query pricing for. Default: 1.</param>
+    /// <returns>GPU information as JSON node.</returns>
+    /// <exception cref="ArgumentException">Thrown when GPU ID is not found.</exception>
     public async Task<JsonNode> GetGpu(string gpuId, int gpuQuantity = 1) {
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.GenerateGpuQuery(gpuId, gpuQuantity));
-        var gpus = rawResponse["data"]!["gpuTypes"]!;
+        var gpus = await graphql.ExecuteAndExtractAsync(
+            Queries.GenerateGpuQuery(gpuId, gpuQuantity),
+            "data.gpuTypes"
+        );
 
         if (gpus is null || (gpus is JsonArray jsonArray && jsonArray.Count < 1)) {
             throw new ArgumentException("No GPU found with the specified ID. Use GetGpus() to see available GPUs.");
@@ -51,23 +73,57 @@ public class Commands {
 
 
 
-    // Fetch all pods
+    /// <summary>
+    /// Fetches all pods owned by the current user.
+    /// </summary>
+    /// <returns>Array of pods as JSON node.</returns>
     public async Task<JsonNode> GetPods() {
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.Pod);
-        return rawResponse["data"]!["myself"]!["pods"]!;
+        return await graphql.ExecuteAndExtractAsync(Queries.Pod, "data.myself.pods");
     }
 
 
 
-    // Fetch a specific pod
+    /// <summary>
+    /// Fetches detailed information about a specific pod.
+    /// </summary>
+    /// <param name="podId">Pod identifier.</param>
+    /// <returns>Pod information as JSON node.</returns>
     public async Task<JsonNode> GetPod(string podId) {
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(Queries.GeneratePodQuery(podId));
-        return rawResponse["data"]!["pod"]!;
+        return await graphql.ExecuteAndExtractAsync(
+            Queries.GeneratePodQuery(podId),
+            "data.pod"
+        );
     }
 
 
 
-    // Create a pod
+    /// <summary>
+    /// Creates a new on-demand GPU pod with specified configuration.
+    /// </summary>
+    /// <param name="name">Pod name.</param>
+    /// <param name="imageName">Docker image to use.</param>
+    /// <param name="gpuTypeId">GPU type identifier.</param>
+    /// <param name="cloudType">Cloud type: ALL, COMMUNITY, or SECURE. Default: ALL.</param>
+    /// <param name="supportPublicIp">Enable public IP address. Default: true.</param>
+    /// <param name="startSsh">Start SSH service. Default: true.</param>
+    /// <param name="dataCenterId">Specific data center ID. Optional.</param>
+    /// <param name="countryCode">Country code for pod location. Optional.</param>
+    /// <param name="gpuCount">Number of GPUs to attach. Default: 1.</param>
+    /// <param name="volumeInGb">Network volume size in GB. Default: 0.</param>
+    /// <param name="containerDiskInGb">Container disk size in GB. Optional.</param>
+    /// <param name="minVcpuCount">Minimum vCPU count. Default: 1.</param>
+    /// <param name="minMemoryInGb">Minimum memory in GB. Default: 1.</param>
+    /// <param name="dockerArgs">Docker container arguments. Default: empty.</param>
+    /// <param name="ports">Ports to expose (e.g., "8888/http"). Optional.</param>
+    /// <param name="volumeMountPath">Volume mount path. Default: /runpod-volume.</param>
+    /// <param name="env">Environment variables. Optional.</param>
+    /// <param name="templateId">Template ID to use. Optional.</param>
+    /// <param name="networkVolumeId">Network volume ID. Optional.</param>
+    /// <param name="allowedCudaVersions">Allowed CUDA versions. Optional.</param>
+    /// <param name="minDownload">Minimum download speed in Mbps. Optional.</param>
+    /// <param name="minUpload">Minimum upload speed in Mbps. Optional.</param>
+    /// <returns>Created pod information as JSON node.</returns>
+    /// <exception cref="ArgumentException">Thrown when cloudType is invalid or GPU not found.</exception>
     public async Task<JsonNode> CreatePod(
         string name,
         string imageName,
@@ -107,59 +163,81 @@ public class Commands {
             env, templateId, networkVolumeId, allowedCudaVersions, minDownload, minUpload
         );
 
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
-        return rawResponse["data"]!["podFindAndDeployOnDemand"]!;
+        return await graphql.ExecuteAndExtractAsync(mutation, "data.podFindAndDeployOnDemand");
     }
 
 
 
-    // Stop a pod
+    /// <summary>
+    /// Stops a running pod.
+    /// </summary>
+    /// <param name="podId">Pod identifier.</param>
+    /// <returns>Pod status as JSON node.</returns>
     public async Task<JsonNode> StopPod(string podId) {
         var mutation = Mutations.GeneratePodStopMutation(podId);
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
-        return rawResponse["data"]!["podStop"]!;
+        return await graphql.ExecuteAndExtractAsync(mutation, "data.podStop");
     }
 
 
 
-    // Resume a pod
+    /// <summary>
+    /// Resumes a stopped pod.
+    /// </summary>
+    /// <param name="podId">Pod identifier.</param>
+    /// <param name="gpuCount">Number of GPUs to attach.</param>
+    /// <returns>Pod status as JSON node.</returns>
     public async Task<JsonNode> ResumePod(string podId, int gpuCount) {
         var mutation = Mutations.GeneratePodResumeMutation(podId, gpuCount);
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
-        return rawResponse["data"]!["podResume"]!;
+        return await graphql.ExecuteAndExtractAsync(mutation, "data.podResume");
     }
 
 
 
-    // Terminate a pod
+    /// <summary>
+    /// Permanently terminates a pod. This action cannot be undone.
+    /// </summary>
+    /// <param name="podId">Pod identifier.</param>
     public async Task TerminatePod(string podId) {
         var mutation = Mutations.GeneratePodTerminateMutation(podId);
-        await client.RunGraphQLAsync<JsonNode>(mutation);
+        await graphql.ExecuteAsync<JsonNode>(mutation);
     }
 
 
 
-    // Create a container registry authentication
+    /// <summary>
+    /// Creates authentication credentials for a container registry.
+    /// </summary>
+    /// <param name="name">Registry name.</param>
+    /// <param name="username">Registry username.</param>
+    /// <param name="password">Registry password.</param>
+    /// <returns>Created registry authentication as JSON node.</returns>
     public async Task<JsonNode> CreateContainerRegistryAuth(string name, string username, string password) {
         var mutation = Mutations.GenerateContainerRegistryAuth(name, username, password);
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
-        return rawResponse["data"]!["saveRegistryAuth"]!;
+        return await graphql.ExecuteAndExtractAsync(mutation, "data.saveRegistryAuth");
     }
 
 
 
-    // Update a container registry authentication
+    /// <summary>
+    /// Updates existing container registry authentication credentials.
+    /// </summary>
+    /// <param name="registryAuthId">Registry authentication ID.</param>
+    /// <param name="username">New username.</param>
+    /// <param name="password">New password.</param>
+    /// <returns>Updated registry authentication as JSON node.</returns>
     public async Task<JsonNode> UpdateContainerRegistryAuth(string registryAuthId, string username, string password) {
         var mutation = Mutations.UpdateContainerRegistryAuth(registryAuthId, username, password);
-        var rawResponse = await client.RunGraphQLAsync<JsonNode>(mutation);
-        return rawResponse["data"]!["updateRegistryAuth"]!;
+        return await graphql.ExecuteAndExtractAsync(mutation, "data.updateRegistryAuth");
     }
 
 
 
-    // Delete a container registry authentication
+    /// <summary>
+    /// Deletes container registry authentication credentials.
+    /// </summary>
+    /// <param name="registryAuthId">Registry authentication ID.</param>
     public async Task DeleteContainerRegistryAuth(string registryAuthId) {
         var mutation = Mutations.DeleteContainerRegistryAuth(registryAuthId);
-        await client.RunGraphQLAsync<JsonNode>(mutation);
+        await graphql.ExecuteAsync<JsonNode>(mutation);
     }
 }

@@ -7,18 +7,15 @@ using System.Text.Json.Nodes;
 namespace Runpod.SDK;
 
 
-internal class RunpodHttpClient {
+internal class RunpodHttpClient : IDisposable {
     private HttpClient baseClient { get; set; }
-    private string? apiKey { get; set; }
     private string graphqlAddress { get; set; }
-    private string endpointAddress { get; set; }
     private readonly RateLimiter rateLimiter = new();
+    private bool disposed = false;
 
 
-    internal RunpodHttpClient(string endpointAddress, string graphqlAddress, string? apiKey = null) {
-        this.endpointAddress = endpointAddress;
+    internal RunpodHttpClient(string endpointAddress, string graphqlAddress) {
         this.graphqlAddress = graphqlAddress;
-        this.apiKey = apiKey;
 
         var handler = new SocketsHttpHandler {
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
@@ -35,29 +32,31 @@ internal class RunpodHttpClient {
             $"({RuntimeInformation.OSDescription}; {RuntimeInformation.ProcessArchitecture})",
             $"Language/.NET {Environment.Version}"
         }));
-        if (apiKey is not null) {
-            baseClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-        }
     }
 
 
 
-    public async Task<T> PostAsync<T>(string endpoint, JsonObject? data = null, int timeout = 10) {
+    public async Task<T> PostAsync<T>(string endpoint, JsonObject? data = null, int timeout = 10, string? apiKey = null) {
         return await rateLimiter.ExecuteAsync(endpoint, async () => {
             return await ExecuteWithRetryAsync(async () => {
                 var cts = new CancellationTokenSource();
                 cts.CancelAfter(TimeSpan.FromSeconds(timeout));
 
-                var response = await baseClient.PostAsync(
-                    cancellationToken: cts.Token,
-                    requestUri: endpoint,
-                    content: data is not null ? new StringContent(
-                        data!.ToString(), 
-                        Encoding.UTF8, 
+                var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+
+                if (apiKey is not null) {
+                    request.Headers.Add("Authorization", $"Bearer {apiKey}");
+                }
+
+                if (data is not null) {
+                    request.Content = new StringContent(
+                        data.ToString(),
+                        Encoding.UTF8,
                         "application/json"
-                    ) : null
-                );
+                    );
+                }
 
+                var response = await baseClient.SendAsync(request, cts.Token);
                 return await ParseResponseAsync<T>(response);
             });
         });
@@ -65,17 +64,19 @@ internal class RunpodHttpClient {
 
 
 
-    public async Task<T> GetAsync<T>(string endpoint, int timeout = 10) {
+    public async Task<T> GetAsync<T>(string endpoint, int timeout = 10, string? apiKey = null) {
         return await rateLimiter.ExecuteAsync(endpoint, async () => {
             return await ExecuteWithRetryAsync(async () => {
                 var cts = new CancellationTokenSource();
                 cts.CancelAfter(TimeSpan.FromSeconds(timeout));
 
-                var response = await baseClient.GetAsync(
-                    cancellationToken: cts.Token,
-                    requestUri: endpoint
-                );
+                var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
 
+                if (apiKey is not null) {
+                    request.Headers.Add("Authorization", $"Bearer {apiKey}");
+                }
+
+                var response = await baseClient.SendAsync(request, cts.Token);
                 return await ParseResponseAsync<T>(response);
             });
         });
@@ -83,21 +84,13 @@ internal class RunpodHttpClient {
 
 
 
-    public async Task<T> RunGraphQLAsync<T>(string query, int timeout = 100) {
-        var json = await PostAsync<JsonObject>(
-            endpoint: $"{graphqlAddress}/graphql?api_key={apiKey}",
-            data: new() { 
-                ["query"] = query 
-            },
-            timeout: timeout
-        );
-
-        if (json!.ContainsKey("errors")) {
-            var errorMessage = json["errors"]?[0]?["message"]?.ToString();
-            throw new QueryException(errorMessage ?? "Unknown error occurred", query.ToString());
-        }
-
-        return json.Deserialize<T>()!;
+    /// <summary>
+    /// Creates a GraphQL client for executing queries and mutations.
+    /// </summary>
+    /// <param name="apiKey">RunPod API key for authentication.</param>
+    /// <returns>GraphQL client instance.</returns>
+    internal GraphQLClient CreateGraphQLClient(string apiKey) {
+        return new GraphQLClient(this, graphqlAddress, apiKey);
     }
 
 
@@ -134,7 +127,7 @@ internal class RunpodHttpClient {
             (
                 httpEx.InnerException is IOException ||
                 (
-                    httpEx.InnerException is System.Net.Sockets.SocketException sockEx && 
+                    httpEx.InnerException is System.Net.Sockets.SocketException sockEx &&
                     IsTransientSocketError(sockEx)
                 ) ||
                 httpEx.Message.Contains("SSL connection could not be established")
@@ -153,5 +146,14 @@ internal class RunpodHttpClient {
             System.Net.Sockets.SocketError.HostUnreachable => true,
             _ => false
         };
+    }
+
+
+
+    public void Dispose() {
+        if (!disposed) {
+            baseClient?.Dispose();
+            disposed = true;
+        }
     }
 }
