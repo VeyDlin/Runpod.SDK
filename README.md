@@ -7,14 +7,14 @@ A modern, type-safe .NET SDK for the [RunPod](https://runpod.io) API. Manage GPU
 
 ## Features
 
-**Full RunPod API Coverage** - Pods, GPUs, Serverless Endpoints, and more
-**Dependency Injection Support** - First-class support for ASP.NET Core
-**Multi-tenant Architecture** - Factory pattern for dynamic API keys
-**Flexible Polling** - Adaptive strategies for real-time and batch jobs
-**Cancellation Support** - Gracefully cancel long-running operations
-**Resource Management** - Proper `IDisposable` implementation
-**Type Safety** - Strongly-typed models with nullability support
-**Rate Limiting** - Built-in protection against API limits
+- **Full RunPod API Coverage** - Pods, GPUs, Serverless Endpoints, and more
+- **Dependency Injection Support** - First-class support for ASP.NET Core
+- **Multi-tenant Architecture** - Factory pattern for dynamic API keys
+- **Flexible Polling** - Adaptive strategies for real-time and batch jobs
+- **Cancellation Support** - Gracefully cancel long-running operations
+- **Resource Management** - Proper `IDisposable` implementation
+- **Type Safety** - Strongly-typed models with nullability support
+- **Rate Limiting** - Built-in protection against API limits
 
 ## Installation
 
