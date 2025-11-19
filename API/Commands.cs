@@ -1,3 +1,4 @@
+using Runpod.SDK.Client;
 using System.Text.Json.Nodes;
 
 namespace Runpod.SDK.API;

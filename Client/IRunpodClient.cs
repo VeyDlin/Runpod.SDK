@@ -1,7 +1,7 @@
 using Runpod.SDK.API;
 using Runpod.SDK.Endpoints;
 
-namespace Runpod.SDK;
+namespace Runpod.SDK.Client;
 
 
 /// <summary>

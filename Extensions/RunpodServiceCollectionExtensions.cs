@@ -1,7 +1,8 @@
 #if NET6_0_OR_GREATER
 using Microsoft.Extensions.DependencyInjection;
+using Runpod.SDK.Client;
 
-namespace Runpod.SDK;
+namespace Runpod.SDK.Extensions;
 
 
 /// <summary>
@@ -52,6 +53,16 @@ public static class RunpodServiceCollectionExtensions {
         configure?.Invoke(options);
 
         services.AddSingleton(options);
+
+        // Register named HttpClient for IHttpClientFactory
+        services.AddHttpClient(
+            RunpodClientFactory.GetHttpClientName(),
+            client => {
+                client.BaseAddress = new Uri(options.endpointAddress);
+                client.Timeout = TimeSpan.FromMinutes(10);
+            }
+        );
+
         services.AddSingleton<IRunpodClientFactory, RunpodClientFactory>();
 
         return services;

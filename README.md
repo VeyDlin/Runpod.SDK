@@ -376,6 +376,24 @@ builder.Services.AddRunpodFactory(options => {
 });
 ```
 
+When using `AddRunpodFactory()`, the SDK automatically uses `IHttpClientFactory` for proper HTTP connection management (DNS rotation, connection pooling). For standalone usage, the factory manages its own HttpClient pool.
+
+#### Standalone Factory Usage
+
+```csharp
+using Runpod.SDK;
+
+// Create factory (remember to dispose)
+using var factory = new RunpodClientFactory();
+
+// Create clients for different users
+var client1 = factory.CreateClient("user1-api-key");
+var client2 = factory.CreateClient("user2-api-key");
+
+// Use clients
+var result1 = await client1.Endpoint("endpoint-id").RunSync<Result>(input);
+```
+
 ## Documentation
 
 - **[RunPod API Docs](https://docs.runpod.io/)** - Official RunPod documentation

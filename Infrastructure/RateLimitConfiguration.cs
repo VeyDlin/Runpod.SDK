@@ -1,4 +1,4 @@
-namespace Runpod.SDK;
+namespace Runpod.SDK.Infrastructure;
 
 internal class RateLimitConfiguration {
     public int requestsPerWindow { get; set; }

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace Runpod.SDK;
+namespace Runpod.SDK.Infrastructure;
 
 internal class RateLimiter {
     private readonly ConcurrentDictionary<string, EndpointRateLimiter> limiters = new();

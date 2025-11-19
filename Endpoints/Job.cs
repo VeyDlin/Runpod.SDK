@@ -1,3 +1,6 @@
+using Runpod.SDK.Client;
+using Runpod.SDK.Exceptions;
+using Runpod.SDK.Infrastructure;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
